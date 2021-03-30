@@ -4,8 +4,9 @@ import numpy as np
 import os
 import math
 import pandas as pd
+from skimage.feature import hog
 
-class ImgData:
+class ProcessImage:
     def __init__(self, dir, path_to_csv):
         self.dir = dir
 
@@ -15,14 +16,56 @@ class ImgData:
         #the image data spreadsheet
         self.imgData = pd.read_csv(path_to_csv, sep=r'\s*,\s*', header=0, encoding='ascii', engine='python')
 
+    def getImgList(self):
+        return self.imgList
+
     def __len__(self):
         return len(self.imgList)
 
-    def getImgData(self, imgName):
-        return np.array(Image.open(self.dir + "/" + imgName))
+    def convertToArray(self, imgName):
+        img = np.array(Image.open(self.dir + "/" + imgName))
+        return np.uint8(img * 255)
 
-    def getImgType(self, imgName):
-        return self.imgData.loc[self.imgData['filename'] == imgName, 'class'].values[0]
+    def getImgClass(self, imgName):
+        return self.imgData.loc[self.imgData['filename'] == "train/"+imgName, 'class'].values[0]
+
+    def getHogFeatures(self, image):
+        return hog(image, orientations = 8, pixels_per_cell = (2,2), cells_per_block = (2,2), visualize=False, block_norm='L2-Hys')
+
+    def extractImages(self, start, stop, length):
+        images = []
+        imageTypes = []
+        for i in range(start, stop):
+            images.append(self.getHogFeatures(self.convertToArray(self.imgList[i])))
+            #type = self.getImgClass(self.imgList[i])
+            # if(type == 0):
+            #     imageTypes.append(0)
+            # else:
+            #     imageTypes.append(1)
+            # print(i)
+            if(self.imgList[i][0] == "N"):
+                imageTypes.append(0)
+            else:
+                imageTypes.append(1)
+
+            print(i)
+
+        for i in range(length - stop, length - start):
+            images.append(self.getHogFeatures(self.convertToArray(self.imgList[i])))
+            #type = self.getImgClass(self.imgList[i])
+            # if(type == 0):
+            #     imageTypes.append(0)
+            # else:
+            #     imageTypes.append(1)
+            # print(i)
+            if(self.imgList[i][0] == "N"):
+                imageTypes.append(0)
+            else:
+                imageTypes.append(1)
+
+            print(self.imgList[i])
+
+        return np.array(images), np.array(imageTypes)
 
     def crossValSet(divisions):
         divLen = math.ceil(len(imgList) / divisions)
@@ -30,41 +73,3 @@ class ImgData:
         for i in range(divisions - 1):
             dataSets.append(imgList[i*divLen : i*divLen + divLen])
         dataSets.append(imgList[divLen*divisions : len(imgList)])
-
-    def getStd(self, imgName):
-        #numpy array indexing is like this, I think. 54 to 74 should be the center since the images are 129x129
-        return np.std(self.getImgData(imgName)[54:74, 54:74])
-
-    def getMean(self, imgName):
-        return np.mean(self.getImgData(imgName)[54:74, 54:74])
-
-    def getImgClass(self, imgName):
-        return
-
-data = ImgData("Project1/train", "Project1/coordinates_train.csv")
-#histSet = []
-negSetX = []
-negSetY = []
-posSetX = []
-posSetY = []
-
-for i in range(5000):
-
-    imgType = data.getImgType("train/" + data.imgList[i])
-
-    std = data.getStd(data.imgList[i])
-    #histSet.append(std)
-
-    if(imgType == 0):
-        negSetX.append(std)
-        negSetY.append(data.getMean(data.imgList[i]))
-    else:
-        posSetX.append(std)
-        posSetY.append(data.getMean(data.imgList[i]))
-
-#plt.hist(histSet, bins=20)
-#plt.show()
-
-plt.scatter(negSetX, negSetY)
-plt.scatter(posSetX, posSetY)
-plt.show()
